@@ -20,7 +20,7 @@
     --T: 20px;    /* closed book thickness, set by JS */
     --o: 12px;    /* how far the hard covers overhang the pages */
     --bt: 5px;    /* board thickness */
-    --cloth: #120c2c;
+    --rc: 6px;    /* rounded board corners */
     --flip: .95s;
   }
   * { box-sizing: border-box; }
@@ -135,82 +135,88 @@
   }
   .face.front.inner::after { background: linear-gradient(90deg, rgba(0,0,0,.38), rgba(0,0,0,.1) 4%, transparent 12%); }
   .face.back.inner::after  { background: linear-gradient(270deg, rgba(0,0,0,.38), rgba(0,0,0,.1) 4%, transparent 12%); }
-  /* ---- hard covers: boards bigger than the pages, with real thickness ---- */
+  /* ---- case-bound hard covers: boards a little bigger than the pages, with thickness ---- */
   .leaf.board {
     width: calc(var(--S) + var(--o)); height: calc(var(--S) + 2 * var(--o));
     top: calc(var(--o) * -1);
   }
-  .leaf.board .face.front { transform: translateZ(calc(var(--bt) / 2)); border-radius: 0 3px 3px 0; }
-  .leaf.board .face.back  { transform: rotateY(180deg) translateZ(calc(var(--bt) / 2)); border-radius: 3px 0 0 3px; }
-  .bedge { position: absolute; background: linear-gradient(90deg, #0e0a24, var(--cloth) 50%, #0e0a24); }
-  .bedge.fore   { width: var(--bt); height: 100%; top: 0; right: calc(var(--bt) / -2); transform: rotateY(90deg); }
-  .bedge.top    { height: var(--bt); width: 100%; left: 0; top: calc(var(--bt) / -2); transform: rotateX(90deg); background: linear-gradient(0deg, #0e0a24, var(--cloth) 50%, #0e0a24); }
-  .bedge.bottom { height: var(--bt); width: 100%; left: 0; bottom: calc(var(--bt) / -2); transform: rotateX(-90deg); background: linear-gradient(0deg, #0e0a24, var(--cloth) 50%, #0e0a24); }
+  .leaf.board .face.front { transform: translateZ(calc(var(--bt) / 2)); border-radius: 0 var(--rc) var(--rc) 0; }
+  .leaf.board .face.back  { transform: rotateY(180deg) translateZ(calc(var(--bt) / 2)); border-radius: var(--rc) 0 0 var(--rc); }
+  /* the printed wrap folds round the board edges */
+  .bedge { position: absolute; background: linear-gradient(90deg, #0d0a26, #3a2c6e 50%, #0d0a26); }
+  .bedge.fore   { width: var(--bt); height: calc(100% - 2 * var(--rc)); top: var(--rc); right: calc(var(--bt) / -2); transform: rotateY(90deg); }
+  .bedge.top    { height: var(--bt); width: calc(100% - var(--rc)); left: 0; top: calc(var(--bt) / -2); transform: rotateX(90deg); background: linear-gradient(0deg, #0d0a26, #3a2c6e 50%, #0d0a26); }
+  .bedge.bottom { height: var(--bt); width: calc(100% - var(--rc)); left: 0; bottom: calc(var(--bt) / -2); transform: rotateX(-90deg); background: linear-gradient(0deg, #0d0a26, #3a2c6e 50%, #0d0a26); }
 
-  /* printed cover: hinge groove near the spine, soft sheen, bevelled board edges */
+  /* glossy laminated print: hinge groove near the spine, rolled edges, a sheen that moves as the book turns */
   .face.cover {
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 0 calc(var(--bt) * 1.4) rgba(0,0,0,.55);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.10),
+      inset 0 0 calc(var(--bt) * 1.2) rgba(0,0,0,.6),
+      inset 0 1px 1px rgba(255,255,255,.18);
   }
   .face.cover::after {
     content: ""; position: absolute; inset: 0; pointer-events: none;
-    background:
-      linear-gradient(90deg, rgba(0,0,0,.55), rgba(255,255,255,.1) 1.2%, transparent 2.4%,
-        transparent 3.4%, rgba(0,0,0,.4) 4%, rgba(255,255,255,.14) 4.6%, transparent 5.6%),
-      linear-gradient(118deg, rgba(255,255,255,.1), transparent 35%, transparent 70%, rgba(255,255,255,.05));
+    background-repeat: no-repeat;
+    background-size: 100% 100%, 260% 100%;
+    background-position: 0 0, var(--sx, 50%) 0;
+    background-image:
+      linear-gradient(90deg,
+        rgba(255,255,255,.10) 0, rgba(0,0,0,.15) 1.6%, transparent 3%,   /* rounded spine edge */
+        transparent 3.8%, rgba(0,0,0,.55) 4.9%, rgba(0,0,0,.25) 5.6%,      /* hinge groove */
+        rgba(255,255,255,.22) 6.3%, rgba(255,255,255,.06) 7.2%, transparent 8.5%),
+      linear-gradient(105deg, transparent 38%, rgba(255,255,255,.13) 47%, rgba(255,255,255,.04) 53%, transparent 62%);
   }
   .face.cover.back::after {
-    background:
-      linear-gradient(270deg, rgba(0,0,0,.55), rgba(255,255,255,.1) 1.2%, transparent 2.4%,
-        transparent 3.4%, rgba(0,0,0,.4) 4%, rgba(255,255,255,.14) 4.6%, transparent 5.6%),
-      linear-gradient(242deg, rgba(255,255,255,.1), transparent 35%, transparent 70%, rgba(255,255,255,.05));
+    background-image:
+      linear-gradient(270deg,
+        rgba(255,255,255,.10) 0, rgba(0,0,0,.15) 1.6%, transparent 3%,
+        transparent 3.8%, rgba(0,0,0,.55) 4.9%, rgba(0,0,0,.25) 5.6%,
+        rgba(255,255,255,.22) 6.3%, rgba(255,255,255,.06) 7.2%, transparent 8.5%),
+      linear-gradient(255deg, transparent 38%, rgba(255,255,255,.13) 47%, rgba(255,255,255,.04) 53%, transparent 62%);
   }
+
+  /* endpapers: plain cream paper */
   .face.end {
     background:
-      radial-gradient(1.2px 1.2px at 20% 30%, rgba(255,255,255,.8), transparent),
-      radial-gradient(1px 1px at 70% 15%, rgba(255,255,255,.7), transparent),
-      radial-gradient(1.4px 1.4px at 82% 64%, rgba(255,255,255,.8), transparent),
-      radial-gradient(1px 1px at 35% 80%, rgba(255,255,255,.6), transparent),
-      radial-gradient(1px 1px at 55% 45%, rgba(255,255,255,.5), transparent),
-      radial-gradient(ellipse at 40% 35%, #46307c, #22174a 55%, #130d2e);
-    background-size: 90px 90px, 130px 130px, 110px 110px, 70px 70px, 150px 150px, cover;
-    display: flex; align-items: center; justify-content: center; flex-direction: column;
-    color: var(--ink-soft); font-style: italic; font-size: calc(var(--S) * .034);
+      radial-gradient(ellipse at 50% 40%, #fbf7ef, #f2ece0 75%, #e9e1d1);
   }
+  /* paste-downs on the boards show the purple wrap turned in round three sides */
   .face.end.turnin {
-    border: var(--o) solid var(--cloth);
-    background-clip: padding-box, padding-box, padding-box, padding-box, padding-box, padding-box;
-    background-color: var(--cloth);
+    border: var(--o) solid #1f1748;
+    background-clip: padding-box;
+    background-color: #1f1748;
   }
   .face.end.turnin::after {
     content: ""; position: absolute; inset: 0; pointer-events: none;
-    box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 0 6px rgba(0,0,0,.4);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.25);
   }
-  .face.end.turnin.back  { border-right-width: 0; }
-  .face.end.turnin.front { border-left-width: 0; }
-  .face.end.turnin.back::after  { background: linear-gradient(270deg, rgba(0,0,0,.4), transparent 6%); }
-  .face.end.turnin.front::after { background: linear-gradient(90deg, rgba(0,0,0,.4), transparent 6%); }
+  .face.end.turnin.back  { border-right-width: 0; border-radius: var(--rc) 0 0 var(--rc); }
+  .face.end.turnin.front { border-left-width: 0; border-radius: 0 var(--rc) var(--rc) 0; }
+  .face.end.turnin.back::after  { background: linear-gradient(270deg, rgba(0,0,0,.28), transparent 7%); }
+  .face.end.turnin.front::after { background: linear-gradient(90deg, rgba(0,0,0,.28), transparent 7%); }
+  .face.end:not(.turnin).back::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(270deg, rgba(0,0,0,.3), rgba(0,0,0,.08) 4%, transparent 12%);
+  }
 
   .edge { position: absolute; transition: opacity .35s ease; }
-  .edge.fore, .edge.top, .edge.bottom {
-    background: repeating-linear-gradient(90deg, #e9dfc8 0 2px, #cfc3a8 2px 3px);
-  }
-  .edge.fore { width: var(--T); height: var(--S); left: calc(var(--S) - var(--T) / 2); top: 0; transform: rotateY(90deg); }
-  .edge.top, .edge.bottom { width: var(--S); height: var(--T); left: 0; background: repeating-linear-gradient(0deg, #e9dfc8 0 2px, #cfc3a8 2px 3px); }
+  .edge.fore { width: var(--T); height: var(--S); left: calc(var(--S) - var(--T) / 2); top: 0; transform: rotateY(90deg);
+    background: linear-gradient(90deg, rgba(0,0,0,.18), transparent 15%, transparent 85%, rgba(0,0,0,.18)), repeating-linear-gradient(90deg, #f6f2ea 0 1.5px, #ddd5c4 1.5px 2px); }
+  .edge.top, .edge.bottom { width: var(--S); height: var(--T); left: 0;
+    background: linear-gradient(0deg, rgba(0,0,0,.18), transparent 15%, transparent 85%, rgba(0,0,0,.18)), repeating-linear-gradient(0deg, #f6f2ea 0 1.5px, #ddd5c4 1.5px 2px); }
   .edge.top { top: calc(var(--T) / -2); transform: rotateX(90deg); }
   .edge.bottom { top: calc(var(--S) - var(--T) / 2); transform: rotateX(-90deg); }
+  /* rounded spine, wrapped in the same printed art as the covers */
   .edge.spine {
     width: calc(var(--T) + 2 * var(--bt)); height: calc(var(--S) + 2 * var(--o));
     left: calc((var(--T) + 2 * var(--bt)) / -2); top: calc(var(--o) * -1);
-    transform: rotateY(-90deg) translateZ(calc(var(--bt) * .6));
-    border-radius: 3px;
+    transform: rotateY(-90deg) translateZ(calc(var(--bt) * .4));
+    border-radius: 2px;
     background:
-      linear-gradient(0deg, rgba(0,0,0,.35), transparent 4%, transparent 96%, rgba(0,0,0,.35)),
-      linear-gradient(90deg, #07051a 0%, #1e1446 18%, #3a2870 46%, #2c1d5c 60%, #140e34 85%, #07051a 100%);
-    box-shadow: inset 0 0 0 1px rgba(240,200,124,.12);
-    display: flex; align-items: center; justify-content: center;
-    writing-mode: vertical-rl;
-    font-family: "IM Fell English SC", serif; color: var(--gold);
-    font-size: calc(var(--T) * .55); letter-spacing: .08em; white-space: nowrap;
+      linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.1) 22%, rgba(255,255,255,.16) 48%, rgba(0,0,0,.05) 70%, rgba(0,0,0,.55)),
+      url("pages/p01.jpg") right center / auto 100% no-repeat,
+      #1f1748;
     backface-visibility: hidden; -webkit-backface-visibility: hidden;
   }
   .book.is-open .edge { opacity: 0; }
@@ -330,7 +336,6 @@
   for (const cls of ['spine', 'fore', 'top', 'bottom']) {
     const e = document.createElement('div');
     e.className = `edge ${cls}`;
-    if (cls === 'spine') e.textContent = "The Universe's Handbook  ✦  Jyotsna Varkey";
     book.appendChild(e);
   }
 
@@ -339,11 +344,12 @@
   function size() {
     const w = innerWidth, h = innerHeight;
     S = Math.round(Math.min(w * 0.78, h * 0.6, 600));
-    T = Math.max(10, Math.round(S * 0.042));
+    T = Math.max(12, Math.round(S * 0.05));
     document.documentElement.style.setProperty('--S', S + 'px');
     document.documentElement.style.setProperty('--T', T + 'px');
-    document.documentElement.style.setProperty('--o', Math.round(S * 0.022) + 'px');
-    document.documentElement.style.setProperty('--bt', Math.max(3, Math.round(S * 0.011)) + 'px');
+    document.documentElement.style.setProperty('--o', Math.round(S * 0.03) + 'px');
+    document.documentElement.style.setProperty('--bt', Math.max(3, Math.round(S * 0.013)) + 'px');
+    document.documentElement.style.setProperty('--rc', Math.max(2, Math.round(S * 0.012)) + 'px');
     layout();
   }
 
@@ -519,6 +525,8 @@
     const s = sway * Math.sin(t / 1600) * 9;
     const st = sway * Math.sin(t / 2300) * 2.5;
     book.style.transform = `rotateX(${(tilt + st).toFixed(2)}deg) rotateY(${(rot + s).toFixed(2)}deg)`;
+    // slide the gloss highlight across the cover as it turns
+    book.style.setProperty('--sx', `${(50 - Math.sin((rot + s) * Math.PI / 180) * 70).toFixed(1)}%`);
   }
   // easing is time-based so it feels the same at any frame rate
   const ease = (rate, n) => 1 - Math.pow(1 - rate, n);
