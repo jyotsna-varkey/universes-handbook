@@ -18,6 +18,9 @@
     --paper: #efe6d2;
     --S: 500px;   /* page size, set by JS */
     --T: 20px;    /* closed book thickness, set by JS */
+    --o: 12px;    /* how far the hard covers overhang the pages */
+    --bt: 5px;    /* board thickness */
+    --cloth: #120c2c;
     --flip: .95s;
   }
   * { box-sizing: border-box; }
@@ -132,12 +135,35 @@
   }
   .face.front.inner::after { background: linear-gradient(90deg, rgba(0,0,0,.38), rgba(0,0,0,.1) 4%, transparent 12%); }
   .face.back.inner::after  { background: linear-gradient(270deg, rgba(0,0,0,.38), rgba(0,0,0,.1) 4%, transparent 12%); }
-  .face.cover { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+  /* ---- hard covers: boards bigger than the pages, with real thickness ---- */
+  .leaf.board {
+    width: calc(var(--S) + var(--o)); height: calc(var(--S) + 2 * var(--o));
+    top: calc(var(--o) * -1);
+  }
+  .leaf.board .face.front { transform: translateZ(calc(var(--bt) / 2)); border-radius: 0 3px 3px 0; }
+  .leaf.board .face.back  { transform: rotateY(180deg) translateZ(calc(var(--bt) / 2)); border-radius: 3px 0 0 3px; }
+  .bedge { position: absolute; background: linear-gradient(90deg, #0e0a24, var(--cloth) 50%, #0e0a24); }
+  .bedge.fore   { width: var(--bt); height: 100%; top: 0; right: calc(var(--bt) / -2); transform: rotateY(90deg); }
+  .bedge.top    { height: var(--bt); width: 100%; left: 0; top: calc(var(--bt) / -2); transform: rotateX(90deg); background: linear-gradient(0deg, #0e0a24, var(--cloth) 50%, #0e0a24); }
+  .bedge.bottom { height: var(--bt); width: 100%; left: 0; bottom: calc(var(--bt) / -2); transform: rotateX(-90deg); background: linear-gradient(0deg, #0e0a24, var(--cloth) 50%, #0e0a24); }
+
+  /* printed cover: hinge groove near the spine, soft sheen, bevelled board edges */
+  .face.cover {
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 0 calc(var(--bt) * 1.4) rgba(0,0,0,.55);
+  }
   .face.cover::after {
     content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(255,255,255,.08) 1.6%, transparent 4%);
+    background:
+      linear-gradient(90deg, rgba(0,0,0,.55), rgba(255,255,255,.1) 1.2%, transparent 2.4%,
+        transparent 3.4%, rgba(0,0,0,.4) 4%, rgba(255,255,255,.14) 4.6%, transparent 5.6%),
+      linear-gradient(118deg, rgba(255,255,255,.1), transparent 35%, transparent 70%, rgba(255,255,255,.05));
   }
-  .face.cover.back::after { background: linear-gradient(270deg, rgba(0,0,0,.45), rgba(255,255,255,.08) 1.6%, transparent 4%); }
+  .face.cover.back::after {
+    background:
+      linear-gradient(270deg, rgba(0,0,0,.55), rgba(255,255,255,.1) 1.2%, transparent 2.4%,
+        transparent 3.4%, rgba(0,0,0,.4) 4%, rgba(255,255,255,.14) 4.6%, transparent 5.6%),
+      linear-gradient(242deg, rgba(255,255,255,.1), transparent 35%, transparent 70%, rgba(255,255,255,.05));
+  }
   .face.end {
     background:
       radial-gradient(1.2px 1.2px at 20% 30%, rgba(255,255,255,.8), transparent),
@@ -150,6 +176,19 @@
     display: flex; align-items: center; justify-content: center; flex-direction: column;
     color: var(--ink-soft); font-style: italic; font-size: calc(var(--S) * .034);
   }
+  .face.end.turnin {
+    border: var(--o) solid var(--cloth);
+    background-clip: padding-box, padding-box, padding-box, padding-box, padding-box, padding-box;
+    background-color: var(--cloth);
+  }
+  .face.end.turnin::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 0 6px rgba(0,0,0,.4);
+  }
+  .face.end.turnin.back  { border-right-width: 0; }
+  .face.end.turnin.front { border-left-width: 0; }
+  .face.end.turnin.back::after  { background: linear-gradient(270deg, rgba(0,0,0,.4), transparent 6%); }
+  .face.end.turnin.front::after { background: linear-gradient(90deg, rgba(0,0,0,.4), transparent 6%); }
 
   .edge { position: absolute; transition: opacity .35s ease; }
   .edge.fore, .edge.top, .edge.bottom {
@@ -160,9 +199,14 @@
   .edge.top { top: calc(var(--T) / -2); transform: rotateX(90deg); }
   .edge.bottom { top: calc(var(--S) - var(--T) / 2); transform: rotateX(-90deg); }
   .edge.spine {
-    width: var(--T); height: var(--S); left: calc(var(--T) / -2); top: 0;
-    transform: rotateY(-90deg);
-    background: linear-gradient(90deg, #0c0820, #2b1c58 50%, #0c0820);
+    width: calc(var(--T) + 2 * var(--bt)); height: calc(var(--S) + 2 * var(--o));
+    left: calc((var(--T) + 2 * var(--bt)) / -2); top: calc(var(--o) * -1);
+    transform: rotateY(-90deg) translateZ(calc(var(--bt) * .6));
+    border-radius: 3px;
+    background:
+      linear-gradient(0deg, rgba(0,0,0,.35), transparent 4%, transparent 96%, rgba(0,0,0,.35)),
+      linear-gradient(90deg, #07051a 0%, #1e1446 18%, #3a2870 46%, #2c1d5c 60%, #140e34 85%, #07051a 100%);
+    box-shadow: inset 0 0 0 1px rgba(240,200,124,.12);
     display: flex; align-items: center; justify-content: center;
     writing-mode: vertical-rl;
     font-family: "IM Fell English SC", serif; color: var(--gold);
@@ -269,9 +313,17 @@
   };
   const leafEls = LEAVES.map((lf, i) => {
     const el = document.createElement('div');
-    el.className = 'leaf';
+    el.className = lf.cover ? 'leaf board' : 'leaf';
     el.appendChild(makeFace(lf.front, 'front', lf.cover && i === 0));
     el.appendChild(makeFace(lf.back, 'back', lf.cover && i === L - 1));
+    if (lf.cover) {
+      el.querySelector('.face.end').classList.add('turnin');
+      for (const side of ['fore', 'top', 'bottom']) {
+        const e = document.createElement('div');
+        e.className = `bedge ${side}`;
+        el.appendChild(e);
+      }
+    }
     book.appendChild(el);
     return el;
   });
@@ -290,6 +342,8 @@
     T = Math.max(10, Math.round(S * 0.042));
     document.documentElement.style.setProperty('--S', S + 'px');
     document.documentElement.style.setProperty('--T', T + 'px');
+    document.documentElement.style.setProperty('--o', Math.round(S * 0.022) + 'px');
+    document.documentElement.style.setProperty('--bt', Math.max(3, Math.round(S * 0.011)) + 'px');
     layout();
   }
 
@@ -332,7 +386,7 @@
     const shift = f === 0 ? 0 : f >= L ? S : S / 2;
     mover.style.transform = `translateX(${shift}px)`;
     // shrink an open spread to fit narrow screens
-    const fit = Math.min(1, (innerWidth * 0.95) / (2 * S), (innerHeight * 0.72) / S);
+    const fit = Math.min(1, (innerWidth * 0.95) / (2 * S * 1.05), (innerHeight * 0.72) / (S * 1.05));
     scaler.style.transform = `scale(${isOpen ? fit : 1})`;
     updateCount();
   }
