@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Universe's Handbook</title>
+<meta name="description" content="The Universe's Handbook, For Small Humans by Jyotsna Varkey. Spin the book, open it, and flip through the pages.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+Double+Pica:ital@0;1&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #0d0922;
+    --violet: #2a1a52;
+    --ink: #f4ead6;
+    --ink-soft: rgba(244, 234, 214, .72);
+    --gold: #f0c87c;
+    --paper: #efe6d2;
+    --S: 500px;   /* page size, set by JS */
+    --T: 20px;    /* closed book thickness, set by JS */
+    --flip: .95s;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--night);
+    color: var(--ink);
+    font-family: "IM Fell Double Pica", Georgia, serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ---------- sky ---------- */
+  .sky {
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 55%, rgba(120, 80, 190, .25), transparent 60%),
+      linear-gradient(160deg, #1b1240, #0d0922 70%);
+  }
+  .sky::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 35%, rgba(6, 4, 18, .75) 100%);
+  }
+  #stars { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  /* drifting characters from the book */
+  .drift { position: fixed; pointer-events: none; filter: drop-shadow(0 10px 24px rgba(0,0,0,.5)); opacity: 0; transition: opacity 1.5s ease; }
+  body.ready .drift { opacity: 1; }
+  .ship { width: clamp(90px, 11vw, 170px); top: 9vh; left: 0; animation: fly 46s linear infinite; }
+  .ship img { width: 100%; display: block; animation: wobble 3.2s ease-in-out infinite; }
+  .drift img { width: 100%; display: block; }
+  @keyframes fly {
+    0%   { transform: translateX(-25vw) translateY(0) rotate(-4deg); }
+    50%  { transform: translateX(50vw) translateY(5vh) rotate(3deg); }
+    100% { transform: translateX(125vw) translateY(-1vh) rotate(-4deg); }
+  }
+  @keyframes wobble { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-8px) rotate(2deg); } }
+
+  /* ---------- header & controls ---------- */
+  header {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding: max(18px, env(safe-area-inset-top)) 16px 0;
+    text-align: center; pointer-events: none; z-index: 5;
+  }
+  header h1 {
+    font-family: "IM Fell English SC", serif; font-weight: 400;
+    font-size: clamp(22px, 3vw, 38px); margin: 0; letter-spacing: .04em;
+    color: var(--ink); text-shadow: 0 2px 18px rgba(170, 120, 255, .45);
+  }
+  header p { margin: 2px 0 0; font-style: italic; color: var(--ink-soft); font-size: clamp(14px, 1.4vw, 18px); }
+
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    padding: 0 16px max(18px, env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .hint { font-style: italic; color: var(--ink-soft); font-size: 16px; text-align: center; min-height: 1.3em; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    font: inherit; font-size: 17px; color: var(--ink);
+    background: rgba(30, 18, 64, .55);
+    border: 1px solid rgba(240, 200, 124, .45);
+    border-radius: 999px; padding: 8px 18px; cursor: pointer;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    transition: background .2s, border-color .2s, transform .15s;
+  }
+  .btn:hover { background: rgba(70, 44, 130, .7); border-color: var(--gold); }
+  .btn:active { transform: scale(.96); }
+  .btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .btn.round { width: 44px; height: 44px; padding: 0; font-size: 22px; line-height: 1; }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .count { font-family: "IM Fell English SC", serif; font-size: 18px; min-width: 120px; text-align: center; color: var(--gold); }
+  .closed-ui, .open-ui { display: none; }
+  body[data-mode="closed"] .closed-ui { display: flex; }
+  body[data-mode="open"] .open-ui { display: flex; }
+
+  /* ---------- the book ---------- */
+  .scene {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    perspective: calc(var(--S) * 4.2);
+    touch-action: none;
+    cursor: grab;
+  }
+  .scene.dragging { cursor: grabbing; }
+  body[data-mode="open"] .scene { cursor: pointer; }
+  .scaler, .floater, .mover, .book { transform-style: preserve-3d; }
+  .scaler { transition: transform 1s cubic-bezier(.5, 0, .2, 1); margin-top: 2vh; opacity: 0; }
+  body.ready .scaler { opacity: 1; transition: transform 1s cubic-bezier(.5, 0, .2, 1), opacity 1.2s ease; }
+  .floater { animation: float 6s ease-in-out infinite; }
+  @keyframes float { 0%,100% { transform: translateY(-6px); } 50% { transform: translateY(6px); } }
+  .mover { width: var(--S); height: var(--S); position: relative; transition: transform var(--flip) cubic-bezier(.5, 0, .2, 1); }
+  .book { position: absolute; inset: 0; transform-origin: 50% 50%; }
+
+  .leaf {
+    position: absolute; left: 0; top: 0; width: var(--S); height: var(--S);
+    transform-origin: 0 50%; transform-style: preserve-3d;
+    transition: transform var(--flip) cubic-bezier(.45, .05, .25, 1);
+  }
+  .face {
+    position: absolute; inset: 0;
+    background: var(--paper) center / cover no-repeat;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    overflow: hidden;
+  }
+  .face.back { transform: rotateY(180deg); }
+  /* gutter shading on inner pages */
+  .face.inner::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+  }
+  .face.front.inner::after { background: linear-gradient(90deg, rgba(0,0,0,.38), rgba(0,0,0,.1) 4%, transparent 12%); }
+  .face.back.inner::after  { background: linear-gradient(270deg, rgba(0,0,0,.38), rgba(0,0,0,.1) 4%, transparent 12%); }
+  .face.cover { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+  .face.cover::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(255,255,255,.08) 1.6%, transparent 4%);
+  }
+  .face.cover.back::after { background: linear-gradient(270deg, rgba(0,0,0,.45), rgba(255,255,255,.08) 1.6%, transparent 4%); }
+  .face.end {
+    background:
+      radial-gradient(1.2px 1.2px at 20% 30%, rgba(255,255,255,.8), transparent),
+      radial-gradient(1px 1px at 70% 15%, rgba(255,255,255,.7), transparent),
+      radial-gradient(1.4px 1.4px at 82% 64%, rgba(255,255,255,.8), transparent),
+      radial-gradient(1px 1px at 35% 80%, rgba(255,255,255,.6), transparent),
+      radial-gradient(1px 1px at 55% 45%, rgba(255,255,255,.5), transparent),
+      radial-gradient(ellipse at 40% 35%, #46307c, #22174a 55%, #130d2e);
+    background-size: 90px 90px, 130px 130px, 110px 110px, 70px 70px, 150px 150px, cover;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    color: var(--ink-soft); font-style: italic; font-size: calc(var(--S) * .034);
+  }
+
+  .edge { position: absolute; transition: opacity .35s ease; }
+  .edge.fore, .edge.top, .edge.bottom {
+    background: repeating-linear-gradient(90deg, #e9dfc8 0 2px, #cfc3a8 2px 3px);
+  }
+  .edge.fore { width: var(--T); height: var(--S); left: calc(var(--S) - var(--T) / 2); top: 0; transform: rotateY(90deg); }
+  .edge.top, .edge.bottom { width: var(--S); height: var(--T); left: 0; background: repeating-linear-gradient(0deg, #e9dfc8 0 2px, #cfc3a8 2px 3px); }
+  .edge.top { top: calc(var(--T) / -2); transform: rotateX(90deg); }
+  .edge.bottom { top: calc(var(--S) - var(--T) / 2); transform: rotateX(-90deg); }
+  .edge.spine {
+    width: var(--T); height: var(--S); left: calc(var(--T) / -2); top: 0;
+    transform: rotateY(-90deg);
+    background: linear-gradient(90deg, #0c0820, #2b1c58 50%, #0c0820);
+    display: flex; align-items: center; justify-content: center;
+    writing-mode: vertical-rl;
+    font-family: "IM Fell English SC", serif; color: var(--gold);
+    font-size: calc(var(--T) * .55); letter-spacing: .08em; white-space: nowrap;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  }
+  .book.is-open .edge { opacity: 0; }
+
+  .shadow {
+    position: absolute; left: 4%; width: 92%; top: calc(var(--S) + 4%); height: 9%;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,.55), transparent 70%);
+    filter: blur(6px);
+    transition: left var(--flip) ease, width var(--flip) ease;
+    transform: translateZ(calc(var(--T) * -2));
+  }
+  .book.is-open ~ .shadow { left: -100%; width: 200%; }
+
+  body.no-anim .leaf, body.no-anim .mover, body.no-anim .scaler, body.no-anim .edge, body.no-anim .shadow { transition: none !important; }
+
+  /* ---------- loader ---------- */
+  .loader {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-style: italic; font-size: 20px; color: var(--ink-soft); z-index: 10;
+    transition: opacity .8s ease;
+  }
+  body.ready .loader { opacity: 0; pointer-events: none; }
+
+  @media (max-width: 600px) {
+    .hint { font-size: 14px; }
+    .btn { font-size: 15px; padding: 7px 14px; }
+    .count { min-width: 80px; font-size: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ship, .ship img, .floater { animation: none; }
+    .ship { left: auto; right: 4vw; }
+  }
+</style>
+</head>
+<body data-mode="closed">
+  <div class="sky"></div>
+  <canvas id="stars"></canvas>
+
+  <div class="drift ship"><img src="art/ship.png" alt=""></div>
+
+  <header>
+    <h1>The Universe's Handbook</h1>
+    <p>For Small Humans · by Jyotsna Varkey</p>
+  </header>
+
+  <div class="scene" id="scene">
+    <div class="scaler" id="scaler">
+      <div class="floater">
+        <div class="mover" id="mover">
+          <div class="book" id="book" aria-label="The Universe's Handbook, a picture book"></div>
+          <div class="shadow"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <div class="hint" id="hint">Drag to spin the book around · tap it to open</div>
+    <div class="controls closed-ui">
+      <button class="btn" id="turnBtn">⟲ Turn it over</button>
+      <button class="btn" id="openBtn">Open the book</button>
+    </div>
+    <div class="controls open-ui">
+      <button class="btn round" id="prevBtn" aria-label="Previous page">‹</button>
+      <div class="count" id="count"></div>
+      <button class="btn round" id="nextBtn" aria-label="Next page">›</button>
+      <button class="btn" id="closeBtn">Close book</button>
+    </div>
+  </div>
+
+  <div class="loader" id="loader">Gathering stardust…</div>
+
+<script>
+(() => {
+  const page = i => `pages/p${String(i).padStart(2, '0')}.jpg`;
+
+  // Leaves of the book. Front face = right-hand page, back face = left-hand page.
+  // PDF page 0 is the cover, page 1 the back cover, pages 2–34 the inside.
+  const LEAVES = [{ front: page(0), back: 'end-front', cover: true }];
+  for (let k = 1; k <= 16; k++) LEAVES.push({ front: page(2 * k), back: page(2 * k + 1) });
+  LEAVES.push({ front: page(34), back: 'end-blank' });
+  LEAVES.push({ front: 'end-back', back: page(1), cover: true });
+  const L = LEAVES.length;          // 19 leaves
+  const LAST_SPREAD = L - 2;        // f = 17 shows pages 33 | 34
+
+  const $ = id => document.getElementById(id);
+  const body = document.body, scene = $('scene'), scaler = $('scaler'), mover = $('mover'), book = $('book');
+  const hint = $('hint'), count = $('count');
+
+  // ---------- build DOM ----------
+  const makeFace = (src, side, isCover) => {
+    const f = document.createElement('div');
+    f.className = `face ${side}`;
+    if (src.startsWith('end')) f.classList.add('end');
+    else {
+      f.style.backgroundImage = `url("${src}")`;
+      f.classList.add(isCover ? 'cover' : 'inner');
+    }
+    return f;
+  };
+  const leafEls = LEAVES.map((lf, i) => {
+    const el = document.createElement('div');
+    el.className = 'leaf';
+    el.appendChild(makeFace(lf.front, 'front', lf.cover && i === 0));
+    el.appendChild(makeFace(lf.back, 'back', lf.cover && i === L - 1));
+    book.appendChild(el);
+    return el;
+  });
+  for (const cls of ['spine', 'fore', 'top', 'bottom']) {
+    const e = document.createElement('div');
+    e.className = `edge ${cls}`;
+    if (cls === 'spine') e.textContent = "The Universe's Handbook  ✦  Jyotsna Varkey";
+    book.appendChild(e);
+  }
+
+  // ---------- sizing ----------
+  let S = 500, T = 20;
+  function size() {
+    const w = innerWidth, h = innerHeight;
+    S = Math.round(Math.min(w * 0.78, h * 0.6, 600));
+    T = Math.max(10, Math.round(S * 0.042));
+    document.documentElement.style.setProperty('--S', S + 'px');
+    document.documentElement.style.setProperty('--T', T + 'px');
+    layout();
+  }
+
+  // ---------- state ----------
+  let mode = 'closed';   // closed | open | busy
+  let f = 0;             // number of leaves flipped to the left
+  let rot = 0, rotTarget = 0, vel = 0;
+  let tilt = 6, tiltTarget = 6;
+  let sway = 0, lastTouch = performance.now();
+
+  function setMode(m) {
+    mode = m;
+    if (m !== 'busy') body.dataset.mode = m;
+    if (m === 'closed') hint.textContent = 'Drag to spin the book around · tap it to open';
+    if (m === 'open') hint.textContent = innerWidth < 700 ? 'Tap the right side to turn the page, left to go back · or swipe' : 'Click the right page to turn forward, the left page to go back · arrow keys work too';
+  }
+
+  function leafTransform(i, flipped) {
+    const dz = T / (L - 1);
+    const z = flipped ? -T / 2 + i * dz : T / 2 - i * dz;
+    return `translateZ(${z.toFixed(2)}px) rotateY(${flipped ? -180 : 0}deg)`;
+  }
+
+  // apply page flips; stagger lets several leaves turn one after another
+  function layout(stagger = 0, order = 1) {
+    const changed = [];
+    leafEls.forEach((el, i) => {
+      const flipped = i < f;
+      if (el._flipped !== flipped) changed.push(i);
+      el._flipped = flipped;
+    });
+    if (order < 0) changed.reverse();
+    leafEls.forEach((el, i) => {
+      const k = changed.indexOf(i);
+      el.style.transitionDelay = k > 0 ? `${k * stagger}ms` : '0ms';
+      el.style.transform = leafTransform(i, i < f);
+    });
+    const isOpen = f > 0 && f < L;
+    book.classList.toggle('is-open', f > 0);
+    const shift = f === 0 ? 0 : f >= L ? S : S / 2;
+    mover.style.transform = `translateX(${shift}px)`;
+    // shrink an open spread to fit narrow screens
+    const fit = Math.min(1, (innerWidth * 0.95) / (2 * S), (innerHeight * 0.72) / S);
+    scaler.style.transform = `scale(${isOpen ? fit : 1})`;
+    updateCount();
+  }
+
+  function updateCount() {
+    if (f <= 0 || f >= L) return;
+    count.textContent = f === 1 ? 'Dedication' : `${f - 1} of ${LAST_SPREAD - 1}`;
+    $('nextBtn').setAttribute('aria-label', f === LAST_SPREAD ? 'Close to the back cover' : 'Next page');
+  }
+
+  // ---------- opening, flipping, closing ----------
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const FLIP_MS = 950;
+
+  async function openBook() {
+    if (mode !== 'closed') return;
+    setMode('busy');
+    vel = 0;
+    rotTarget = Math.round(rot / 360) * 360;   // spin round to the front cover
+    while (Math.abs(rot - rotTarget) > 1.5) await wait(30);
+    rot = rotTarget = 0;
+    tiltTarget = 14;
+    f = 1; layout();
+    await wait(FLIP_MS);
+    setMode('open');
+  }
+
+  async function next() {
+    if (mode !== 'open') return;
+    if (f >= LAST_SPREAD) return closeToBack();
+    setMode('busy');
+    f++; layout();
+    await wait(FLIP_MS * 0.55);
+    setMode('open');
+  }
+
+  async function prev() {
+    if (mode !== 'open') return;
+    setMode('busy');
+    f--; layout();
+    if (f === 0) { tiltTarget = 6; await wait(FLIP_MS); setMode('closed'); return; }
+    await wait(FLIP_MS * 0.55);
+    setMode('open');
+  }
+
+  async function closeBook() {
+    if (mode !== 'open') return;
+    setMode('busy');
+    const n = f;
+    f = 0; layout(90, -1);
+    tiltTarget = 6;
+    await wait(FLIP_MS + n * 90);
+    setMode('closed');
+  }
+
+  // flip the last page and the back cover over, then show the back of the book
+  async function closeToBack() {
+    setMode('busy');
+    f = L; layout(160, 1);
+    tiltTarget = 6;
+    await wait(FLIP_MS + 200);
+    // swap to the equivalent "closed and turned around" pose without animation
+    body.classList.add('no-anim');
+    f = 0; layout();
+    rot = rotTarget = 180;
+    render();
+    void mover.offsetWidth;
+    requestAnimationFrame(() => requestAnimationFrame(() => body.classList.remove('no-anim')));
+    setMode('closed');
+    hint.textContent = 'The end! Spin it again, or tap to read it once more';
+  }
+
+  // ---------- spinning the closed book ----------
+  let drag = null;
+  scene.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    lastTouch = performance.now();
+    drag = { x: e.clientX, y: e.clientY, rot0: rotTarget, moved: 0, t: performance.now(), lastX: e.clientX };
+    if (mode === 'closed') { scene.classList.add('dragging'); vel = 0; }
+    scene.setPointerCapture(e.pointerId);
+  });
+  scene.addEventListener('pointermove', e => {
+    if (!drag) return;
+    drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
+    if (mode === 'closed' && drag.moved > 4) {
+      const now = performance.now();
+      const dx = e.clientX - drag.lastX;
+      vel = dx * 0.45 / Math.max(1, (now - drag.t) / 16.7);
+      drag.t = now; drag.lastX = e.clientX;
+      rotTarget = rot = drag.rot0 + (e.clientX - drag.x) * 0.45;
+      lastTouch = now;
+    }
+  });
+  const endDrag = e => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    scene.classList.remove('dragging');
+    lastTouch = performance.now();
+    const dx = e.clientX - d.x;
+    if (mode === 'closed') {
+      if (d.moved < 6) {
+        const r = book.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) openBook();
+      }
+      // otherwise momentum carries on in the animation loop
+    } else if (mode === 'open') {
+      if (d.moved > 40 && Math.abs(dx) > 40) { dx < 0 ? next() : prev(); }
+      else if (d.moved < 10) { e.clientX >= innerWidth / 2 ? next() : prev(); }
+    }
+  };
+  scene.addEventListener('pointerup', endDrag);
+  scene.addEventListener('pointercancel', () => { drag = null; scene.classList.remove('dragging'); });
+
+  // ---------- buttons & keys ----------
+  $('turnBtn').onclick = () => { vel = 0; rotTarget = Math.round(rotTarget / 180) * 180 + 180; lastTouch = performance.now(); };
+  $('openBtn').onclick = openBook;
+  $('nextBtn').onclick = next;
+  $('prevBtn').onclick = prev;
+  $('closeBtn').onclick = closeBook;
+  addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') mode === 'open' ? next() : (rotTarget += 30, lastTouch = performance.now());
+    else if (e.key === 'ArrowLeft') mode === 'open' ? prev() : (rotTarget -= 30, lastTouch = performance.now());
+    else if (e.key === 'Escape') closeBook();
+    else if ((e.key === 'Enter' || e.key === ' ') && mode === 'closed' && document.activeElement === document.body) { e.preventDefault(); openBook(); }
+  });
+
+  // ---------- animation loop ----------
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function render(t = performance.now()) {
+    const s = sway * Math.sin(t / 1600) * 9;
+    const st = sway * Math.sin(t / 2300) * 2.5;
+    book.style.transform = `rotateX(${(tilt + st).toFixed(2)}deg) rotateY(${(rot + s).toFixed(2)}deg)`;
+  }
+  // easing is time-based so it feels the same at any frame rate
+  const ease = (rate, n) => 1 - Math.pow(1 - rate, n);
+  let lastT = performance.now();
+  function loop(t) {
+    const n = Math.min(30, (t - lastT) / 16.7); lastT = t;
+    if (!drag || mode !== 'closed') {
+      if (Math.abs(vel) > 0.02) { rotTarget += vel * (1 - Math.pow(0.94, n)) / 0.06; vel *= Math.pow(0.94, n); }
+      rot += (rotTarget - rot) * ease(0.11, n);
+    }
+    tilt += (tiltTarget - tilt) * ease(0.08, n);
+    const idle = mode === 'closed' && !drag && Math.abs(vel) < 0.05 && t - lastTouch > 2500 && !reduced;
+    sway += ((idle ? 1 : 0) - sway) * ease(0.02, n);
+    render(t);
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- twinkling stars ----------
+  const cv = $('stars'), cx = cv.getContext('2d');
+  let stars = [], comets = [];
+  function initStars() {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.round(innerWidth * innerHeight / 5500);
+    stars = Array.from({ length: n }, () => ({
+      x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+      r: Math.random() * 1.3 + 0.3, p: Math.random() * Math.PI * 2, s: 0.5 + Math.random() * 1.5,
+      warm: Math.random() < 0.25
+    }));
+  }
+  function drawStars(t) {
+    cx.clearRect(0, 0, innerWidth, innerHeight);
+    for (const st of stars) {
+      const a = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(st.p + t / 1000 * st.s));
+      cx.globalAlpha = a;
+      cx.fillStyle = st.warm ? '#ffe2a8' : '#ffffff';
+      cx.beginPath(); cx.arc(st.x, st.y, st.r, 0, 7); cx.fill();
+      if (st.r > 1.4 && a > 0.85) {           // little four-point sparkle like the book's stars
+        cx.globalAlpha = (a - 0.85) * 4;
+        cx.fillRect(st.x - st.r * 4, st.y - 0.4, st.r * 8, 0.8);
+        cx.fillRect(st.x - 0.4, st.y - st.r * 4, 0.8, st.r * 8);
+      }
+    }
+    // comets: glowing head with a long pink-white tail, like the comet Duba-I
+    if (comets.length < 2 && Math.random() < 0.008) {
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      comets.push({
+        x: dir > 0 ? Math.random() * innerWidth * 0.5 : innerWidth * (0.5 + Math.random() * 0.5),
+        y: Math.random() * innerHeight * 0.45,
+        vx: dir * (4 + Math.random() * 3), vy: 1.2 + Math.random() * 1.6,
+        len: 140 + Math.random() * 140, life: 0, max: 90 + Math.random() * 60
+      });
+    }
+    comets = comets.filter(c => c.life < c.max);
+    for (const c of comets) {
+      c.life++; c.x += c.vx; c.y += c.vy;
+      const k = c.life / c.max, a = Math.min(1, k * 6, (1 - k) * 3);
+      const sp = Math.hypot(c.vx, c.vy), tx = c.x - c.vx / sp * c.len, ty = c.y - c.vy / sp * c.len;
+      const g = cx.createLinearGradient(tx, ty, c.x, c.y);
+      g.addColorStop(0, 'rgba(200,140,255,0)'); g.addColorStop(.7, 'rgba(255,180,230,.45)'); g.addColorStop(1, 'rgba(255,245,255,.95)');
+      cx.globalAlpha = a; cx.strokeStyle = g; cx.lineCap = 'round';
+      cx.lineWidth = 3; cx.beginPath(); cx.moveTo(tx, ty); cx.lineTo(c.x, c.y); cx.stroke();
+      const h = cx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 9);
+      h.addColorStop(0, 'rgba(255,255,255,1)'); h.addColorStop(1, 'rgba(255,200,240,0)');
+      cx.fillStyle = h; cx.beginPath(); cx.arc(c.x, c.y, 9, 0, 7); cx.fill();
+    }
+    cx.globalAlpha = 1;
+    if (!reduced) requestAnimationFrame(drawStars);
+  }
+
+  addEventListener('resize', () => { size(); initStars(); if (reduced) drawStars(0); });
+
+  // ---------- start ----------
+  size(); initStars(); requestAnimationFrame(drawStars); requestAnimationFrame(loop);
+  const load = src => new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = src; });
+  Promise.all([page(0), page(1), page(2), page(3), page(4)].map(load)).then(() => {
+    body.classList.add('ready');
+    // warm the cache for the rest, in reading order
+    (async () => { for (let i = 5; i < 35; i++) await load(page(i)); })();
+  });
+})();
+</script>
+</body>
+</html>
