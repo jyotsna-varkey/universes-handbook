@@ -340,7 +340,7 @@
   }
 
   // ---------- sizing ----------
-  let S = 500, T = 20;
+  let S = 500, T = 20, BT = 5;
   function size() {
     const w = innerWidth, h = innerHeight;
     S = Math.round(Math.min(w * 0.78, h * 0.6, 600));
@@ -348,7 +348,8 @@
     document.documentElement.style.setProperty('--S', S + 'px');
     document.documentElement.style.setProperty('--T', T + 'px');
     document.documentElement.style.setProperty('--o', Math.round(S * 0.03) + 'px');
-    document.documentElement.style.setProperty('--bt', Math.max(3, Math.round(S * 0.013)) + 'px');
+    BT = Math.max(3, Math.round(S * 0.013));
+    document.documentElement.style.setProperty('--bt', BT + 'px');
     document.documentElement.style.setProperty('--rc', Math.max(2, Math.round(S * 0.012)) + 'px');
     layout();
   }
@@ -368,8 +369,15 @@
   }
 
   function leafTransform(i, flipped) {
-    const dz = T / (L - 1);
-    const z = flipped ? -T / 2 + i * dz : T / 2 - i * dz;
+    // boards sit at the outside; pages are spread out between their inner faces
+    // (keeping clear of the boards' thickness so a cover never draws over a page)
+    let z;
+    if (i === 0 || i === L - 1) z = (T / 2 - BT / 2) * (i === 0 ? 1 : -1);
+    else {
+      const a = T / 2 - BT - 1;
+      z = a - (i - 1) * (2 * a / (L - 3));
+    }
+    if (flipped) z = -z;
     return `translateZ(${z.toFixed(2)}px) rotateY(${flipped ? -180 : 0}deg)`;
   }
 
